@@ -70,15 +70,17 @@ class McpService : Service() {
                         ContentType.Text.Plain,
                     )
                 }
-                post("/mcp") {
-                    if (!authorized(call.request.header("Authorization"), expected)) {
-                        call.respondText("""{"error":"unauthorized"}""", ContentType.Application.Json, HttpStatusCode.Unauthorized)
-                        return@post
-                    }
+                // Two ways to present the token:
+                //   POST /mcp            with  Authorization: Bearer <token>   (for clients that support headers)
+                //   POST /t/<token>/mcp  with  no auth header                  (for the Claude app's custom-connector
+                //                                                               form, which has no token field)
+                // Both are compared in constant time; the URL form is as secret as the header form because the
+                // whole URL travels inside TLS, and trycloudflare/ngrok hosts are random anyway.
+                suspend fun io.ktor.server.routing.RoutingContext.serveMcp() {
                     val body = call.receiveText()
                     if (body.length > MAX_BODY) {
                         call.respond(HttpStatusCode.PayloadTooLarge)
-                        return@post
+                        return
                     }
                     val response = try {
                         app.mcp.handle(body)
@@ -89,8 +91,27 @@ class McpService : Service() {
                     if (response == null) call.respond(HttpStatusCode.Accepted)
                     else call.respondText(response, ContentType.Application.Json)
                 }
+
+                post("/mcp") {
+                    if (!authorized(call.request.header("Authorization"), expected)) {
+                        call.response.headers.append("WWW-Authenticate", "Bearer realm=\"claude-launcher\"")
+                        call.respondText("""{"error":"unauthorized"}""", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                        return@post
+                    }
+                    serveMcp()
+                }
+                post("/t/{token}/mcp") {
+                    val presented = call.parameters["token"] ?: ""
+                    if (!MessageDigest.isEqual(presented.toByteArray(), expected.toByteArray())) {
+                        call.respondText("""{"error":"unauthorized"}""", ContentType.Application.Json, HttpStatusCode.Unauthorized)
+                        return@post
+                    }
+                    serveMcp()
+                }
                 get("/mcp") { call.respond(HttpStatusCode.MethodNotAllowed) }
+                get("/t/{token}/mcp") { call.respond(HttpStatusCode.MethodNotAllowed) }
                 delete("/mcp") { call.respond(HttpStatusCode.OK) } // stateless: nothing to tear down
+                delete("/t/{token}/mcp") { call.respond(HttpStatusCode.OK) }
             }
         }.also {
             try {

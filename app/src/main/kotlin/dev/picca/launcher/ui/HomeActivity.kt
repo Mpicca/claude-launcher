@@ -51,7 +51,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -279,24 +281,32 @@ private fun SettingsSheet(vm: HomeViewModel) {
         Spacer(Modifier.height(12.dp))
         Button(onClick = { vm.toggleServer(); running = !running }) { Text(if (running) "Stop MCP server" else "Start MCP server") }
         Spacer(Modifier.height(12.dp))
+        val clipboard = LocalClipboardManager.current
+        val connectorPath = "/t/$token/mcp"
         Surface(color = Color(0x22FFFFFF), shape = RoundedCornerShape(10.dp)) {
             Column(Modifier.padding(12.dp)) {
-                Text("Endpoint", fontWeight = FontWeight.Bold)
-                Text("http://${ip ?: "<phone-ip>"}:${vm.port}/mcp", fontSize = 13.sp)
+                Text("Connector path (no auth needed)", fontWeight = FontWeight.Bold)
+                Text(connectorPath, fontSize = 12.sp)
+                Text(
+                    "Paste your tunnel address + this path into Claude → Connectors, e.g.\n" +
+                        "https://<your-tunnel>.trycloudflare.com$connectorPath",
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 Spacer(Modifier.height(8.dp))
-                Text("Bearer token", fontWeight = FontWeight.Bold)
-                Text(token, fontSize = 12.sp)
+                Text("Local endpoint", fontWeight = FontWeight.Bold)
+                Text("http://${ip ?: "<phone-ip>"}:${vm.port}/mcp  (Bearer token below)", fontSize = 12.sp)
+                Text(token, fontSize = 11.sp)
             }
         }
         Spacer(Modifier.height(8.dp))
         Row {
+            TextButton(onClick = { clipboard.setText(AnnotatedString(connectorPath)) }) { Text("Copy path") }
             TextButton(onClick = { token = vm.rotateToken() }) { Text("Rotate token") }
             TextButton(onClick = { vm.showAll() }) { Text("Place all apps") }
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "To use from Claude: expose this endpoint on a URL Claude can reach (Tailscale Funnel or a Cloudflare tunnel), " +
-                "then add it as a custom connector with the bearer token. See README.",
+            "Rotating the token invalidates the old connector URL. Stop the server when you're not using it.",
             style = MaterialTheme.typography.bodySmall,
         )
     }

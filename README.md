@@ -107,8 +107,11 @@ the same Wi-Fi also works and gives you a `*.trycloudflare.com` URL.
 
 Then in Claude → Settings → Connectors → **Add custom connector**:
 
-- URL: `https://<your-tunnel-host>/mcp`
-- Authentication: bearer token → paste the token from the app
+- URL: `https://<your-tunnel-host>/t/<token>/mcp` — the launcher's Claude sheet shows this
+  exact path (tap **Copy path**). No auth fields needed: the token rides in the URL, which
+  is protected by TLS end to end.
+- Clients that support headers can instead use `https://<your-tunnel-host>/mcp` with
+  `Authorization: Bearer <token>`.
 
 Ask Claude: *"List my apps and organize them into sensible folders."* It will call
 `list_apps`, propose a plan, and call `apply_plan`. The folders appear on the phone
