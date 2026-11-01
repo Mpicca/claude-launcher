@@ -9,6 +9,7 @@ import dev.picca.launcher.core.model.AppRef
 import dev.picca.launcher.core.model.Item
 import dev.picca.launcher.core.model.Layout
 import dev.picca.launcher.mcp.McpService
+import dev.picca.launcher.mcp.NgrokTunnel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,6 +66,28 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun rotateToken(): String = launcherApp.pairing.rotate().also {
         if (McpService.running) { McpService.stop(getApplication<Application>()); McpService.start(getApplication<Application>()) }
+    }
+
+    val tunnelState: StateFlow<NgrokTunnel.State> get() = launcherApp.tunnel.state
+    val tunnelAvailable: Boolean get() = launcherApp.tunnel.available
+    val ngrokAuthtoken: String get() = launcherApp.pairing.ngrokAuthtoken
+    val ngrokDomain: String get() = launcherApp.pairing.ngrokDomain
+    val connectorUrl: String? get() = launcherApp.pairing.connectorUrl
+
+    /** One-time setup: save the ngrok credentials, turn the server on, and (re)start it so the tunnel comes up. */
+    fun saveTunnel(authtoken: String, domain: String) {
+        val p = launcherApp.pairing
+        p.ngrokAuthtoken = authtoken
+        p.ngrokDomain = domain
+        val ctx = getApplication<Application>()
+        if (McpService.running) McpService.stop(ctx)
+        if (p.tunnelConfigured) {
+            p.serverEnabled = true
+            McpService.start(ctx)
+            _toast.value = "Tunnel saved — starting"
+        } else {
+            _toast.value = "Tunnel cleared"
+        }
     }
 
     private fun mutate(block: () -> String) {

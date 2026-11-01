@@ -35,7 +35,9 @@ import java.security.MessageDigest
  *   GET  /mcp  — server-initiated stream not supported → 405 (allowed by the spec)
  *   GET  /health — unauthenticated liveness check
  *
- * Auth: `Authorization: Bearer <token>` on every /mcp request. Constant-time comparison.
+ * Auth: `Authorization: Bearer <token>` on every /mcp request (or the token in the URL path).
+ * Constant-time comparison. When an ngrok static domain is configured, the bundled ngrok
+ * agent is started alongside the server so the endpoint has a permanent public HTTPS URL.
  */
 class McpService : Service() {
     private var server: EmbeddedServer<*, *>? = null
@@ -117,6 +119,9 @@ class McpService : Service() {
             try {
                 it.start(wait = false)
                 Log.i(TAG, "MCP server listening on :$port")
+                if (app.pairing.tunnelConfigured) {
+                    app.tunnel.start(port, app.pairing.ngrokAuthtoken, app.pairing.ngrokDomain)
+                }
             } catch (e: Throwable) {
                 Log.e(TAG, "failed to start MCP server on :$port", e)
                 running = false
@@ -162,6 +167,7 @@ class McpService : Service() {
     }
 
     override fun onDestroy() {
+        LauncherApp.instance.tunnel.stop()
         server?.stop(500, 1000)
         server = null
         running = false
@@ -181,7 +187,13 @@ class McpService : Service() {
 
         fun start(context: Context) {
             val i = Intent(context, McpService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(i) else context.startService(i)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(i) else context.startService(i)
+            } catch (e: Exception) {
+                // Android 12+ refuses background FGS starts outside the boot/launch exemptions;
+                // the next app launch or reboot will try again.
+                Log.w(TAG, "could not start MCP service now: ${e.message}")
+            }
         }
 
         fun stop(context: Context) {

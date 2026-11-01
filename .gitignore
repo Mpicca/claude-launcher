@@ -7,3 +7,6 @@ local.properties
 .DS_Store
 *.apk
 *.aab
+
+# ngrok agent is fetched by CI into jniLibs; never commit the binary
+app/src/main/jniLibs/

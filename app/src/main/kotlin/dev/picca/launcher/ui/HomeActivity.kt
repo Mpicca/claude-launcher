@@ -28,7 +28,9 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,6 +66,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.picca.launcher.core.model.AppRef
 import dev.picca.launcher.core.model.Item
 import dev.picca.launcher.core.model.Layout
+import dev.picca.launcher.mcp.NgrokTunnel
 
 class HomeActivity : ComponentActivity() {
     private val vm: HomeViewModel by viewModels()
@@ -270,7 +273,7 @@ private fun SettingsSheet(vm: HomeViewModel) {
     var running by remember { mutableStateOf(vm.serverRunning) }
     var token by remember { mutableStateOf(vm.pairingToken) }
     val ip = remember { LocalIp.get() }
-    Column(Modifier.padding(16.dp)) {
+    Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
         Text("Claude connection", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
         Text(
@@ -282,31 +285,72 @@ private fun SettingsSheet(vm: HomeViewModel) {
         Button(onClick = { vm.toggleServer(); running = !running }) { Text(if (running) "Stop MCP server" else "Start MCP server") }
         Spacer(Modifier.height(12.dp))
         val clipboard = LocalClipboardManager.current
-        val connectorPath = "/t/$token/mcp"
+        val tunnelState by vm.tunnelState.collectAsStateWithLifecycle()
+        var authtoken by remember { mutableStateOf(vm.ngrokAuthtoken) }
+        var domain by remember { mutableStateOf(vm.ngrokDomain) }
+        val connectorUrl = if (domain.isBlank()) null else "https://${domain.trim().removePrefix("https://").trimEnd('/')}/t/$token/mcp"
+
+        // ── Permanent public URL via the bundled ngrok agent ──────────────────────────────
         Surface(color = Color(0x22FFFFFF), shape = RoundedCornerShape(10.dp)) {
             Column(Modifier.padding(12.dp)) {
-                Text("Connector path (no auth needed)", fontWeight = FontWeight.Bold)
-                Text(connectorPath, fontSize = 12.sp)
+                Text("Permanent URL (ngrok, built in)", fontWeight = FontWeight.Bold)
                 Text(
-                    "Paste your tunnel address + this path into Claude → Connectors, e.g.\n" +
-                        "https://<your-tunnel>.trycloudflare.com$connectorPath",
+                    "One-time setup: at dashboard.ngrok.com copy your Authtoken and claim a free static Domain. " +
+                        "The app then runs the tunnel itself, on boot, forever.",
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Spacer(Modifier.height(8.dp))
-                Text("Local endpoint", fontWeight = FontWeight.Bold)
-                Text("http://${ip ?: "<phone-ip>"}:${vm.port}/mcp  (Bearer token below)", fontSize = 12.sp)
-                Text(token, fontSize = 11.sp)
+                OutlinedTextField(
+                    value = authtoken, onValueChange = { authtoken = it }, singleLine = true,
+                    label = { Text("ngrok authtoken") }, modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = domain, onValueChange = { domain = it }, singleLine = true,
+                    label = { Text("ngrok static domain (e.g. name.ngrok-free.app)") }, modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(6.dp))
+                Row {
+                    Button(onClick = { vm.saveTunnel(authtoken, domain); running = true }) { Text("Save & start") }
+                    Spacer(Modifier.size(8.dp))
+                    if (connectorUrl != null) {
+                        OutlinedButton(onClick = { clipboard.setText(AnnotatedString(connectorUrl)) }) { Text("Copy connector URL") }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                val (status, color) = when (val s = tunnelState) {
+                    is NgrokTunnel.State.Off -> (if (vm.tunnelAvailable) "Tunnel off" else "ngrok not bundled in this build") to Color(0xFFBDBDBD)
+                    is NgrokTunnel.State.Starting -> "Tunnel starting…" to Color(0xFFFFC107)
+                    is NgrokTunnel.State.Online -> "Online: ${s.url}" to Color(0xFF4CAF50)
+                    is NgrokTunnel.State.Error -> "Tunnel error: ${s.message}" to Color(0xFFEF5350)
+                }
+                Text(status, color = color, fontSize = 12.sp)
+                if (connectorUrl != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Text("Claude connector URL (no auth fields needed)", fontWeight = FontWeight.Bold)
+                    Text(connectorUrl, fontSize = 12.sp)
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+
+        // ── Manual / LAN fallback ─────────────────────────────────────────────────────────
+        Surface(color = Color(0x22FFFFFF), shape = RoundedCornerShape(10.dp)) {
+            Column(Modifier.padding(12.dp)) {
+                Text("Local endpoint (any other tunnel)", fontWeight = FontWeight.Bold)
+                Text("http://${ip ?: "<phone-ip>"}:${vm.port}/mcp", fontSize = 12.sp)
+                Text("Path form: /t/$token/mcp   ·   Header form: Authorization: Bearer $token", fontSize = 11.sp)
             }
         }
         Spacer(Modifier.height(8.dp))
         Row {
-            TextButton(onClick = { clipboard.setText(AnnotatedString(connectorPath)) }) { Text("Copy path") }
+            TextButton(onClick = { clipboard.setText(AnnotatedString("/t/$token/mcp")) }) { Text("Copy path") }
             TextButton(onClick = { token = vm.rotateToken() }) { Text("Rotate token") }
             TextButton(onClick = { vm.showAll() }) { Text("Place all apps") }
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "Rotating the token invalidates the old connector URL. Stop the server when you're not using it.",
+            "Rotating the token invalidates the old connector URL. The server and tunnel restart automatically after a reboot.",
             style = MaterialTheme.typography.bodySmall,
         )
     }

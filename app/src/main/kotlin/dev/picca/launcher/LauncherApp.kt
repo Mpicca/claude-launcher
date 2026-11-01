@@ -6,6 +6,8 @@ import dev.picca.launcher.core.mcp.McpServer
 import dev.picca.launcher.data.FileLayoutStore
 import dev.picca.launcher.data.InstalledAppCatalog
 import dev.picca.launcher.data.PairingConfig
+import dev.picca.launcher.mcp.McpService
+import dev.picca.launcher.mcp.NgrokTunnel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -20,6 +22,7 @@ class LauncherApp : Application() {
     lateinit var engine: LayoutEngine private set
     lateinit var mcp: McpServer private set
     lateinit var pairing: PairingConfig private set
+    lateinit var tunnel: NgrokTunnel private set
 
     private val _layoutFlow = MutableStateFlow(dev.picca.launcher.core.model.Layout())
     val layoutFlow: StateFlow<dev.picca.launcher.core.model.Layout> get() = _layoutFlow
@@ -41,6 +44,9 @@ class LauncherApp : Application() {
         mcp = McpServer(engine, serverVersion = BuildConfig.VERSION_NAME)
         catalog.onChanged = { runCatching { engine.pruneUninstalled() }; _layoutFlow.value = engine.current }
         catalog.startWatching()
+        tunnel = NgrokTunnel(this)
+        // A launcher process lives as long as the phone is on, so "start with the app" ≈ "always on".
+        if (pairing.serverEnabled && !McpService.running) McpService.start(this)
     }
 
     companion object {

@@ -93,25 +93,40 @@ Gestures on the home screen:
 ## Connecting from Claude
 
 Claude's custom connectors need an **HTTPS URL they can reach**; a LAN address won't do.
-Two easy options:
 
-**Tailscale Funnel** (simplest; keeps the phone off the public internet except via Tailscale):
+### Built-in permanent tunnel (recommended — set up once, never touch again)
+
+The APK bundles the ngrok agent. With a free ngrok **static domain** the public URL never
+changes, and the app runs the tunnel itself — on boot, after updates, on any network.
+
+1. At [dashboard.ngrok.com](https://dashboard.ngrok.com): copy your **Authtoken**
+   (Getting Started → Your Authtoken) and claim your free **static domain**
+   (Universal Gateway → Domains → New Domain; it looks like `name.ngrok-free.app`).
+2. On the phone: **Claude ○** → paste both → **Save & start**. The sheet shows
+   `Online: https://name.ngrok-free.app` within a few seconds, and the
+   **Claude connector URL** underneath. Tap **Copy connector URL**.
+3. Claude → Settings → Connectors → **Add custom connector** → paste that URL.
+   No auth fields: the token rides in the URL path, protected by TLS end to end.
+
+That's it. The server and tunnel restart automatically after a reboot or app update
+(`RECEIVE_BOOT_COMPLETED`). Rotating the token changes the URL; the domain never changes.
+
+Notes: the ngrok free tier serves an interstitial page to *browsers*, but API clients such as
+Claude's connector are passed straight through. The agent reads its DNS servers from the app's
+config (`dns_resolver_ips`) because Go binaries can't see Android's resolver settings.
+
+### Any other tunnel
+
+The server also listens on `http://<phone-ip>:8765` so you can front it with anything else:
 
 ```bash
-# on the phone's Tailscale node, or any node that can reach the phone's Tailscale IP
-tailscale funnel --bg --set-path=/mcp http://<phone-tailscale-ip>:8765/mcp
+tailscale funnel --bg --set-path=/mcp http://<phone-tailscale-ip>:8765/mcp   # stable *.ts.net URL
+cloudflared tunnel --url http://<phone-ip>:8765                               # random trycloudflare URL
 ```
 
-**Cloudflare Tunnel** (`cloudflared tunnel --url http://<phone-ip>:8765`) from a laptop on
-the same Wi-Fi also works and gives you a `*.trycloudflare.com` URL.
-
-Then in Claude → Settings → Connectors → **Add custom connector**:
-
-- URL: `https://<your-tunnel-host>/t/<token>/mcp` — the launcher's Claude sheet shows this
-  exact path (tap **Copy path**). No auth fields needed: the token rides in the URL, which
-  is protected by TLS end to end.
-- Clients that support headers can instead use `https://<your-tunnel-host>/mcp` with
-  `Authorization: Bearer <token>`.
+Then add `https://<your-tunnel-host>/t/<token>/mcp` as the connector (tap **Copy path** in the
+app for the `/t/<token>/mcp` part), or `https://<your-tunnel-host>/mcp` with
+`Authorization: Bearer <token>` for clients that support headers.
 
 Ask Claude: *"List my apps and organize them into sensible folders."* It will call
 `list_apps`, propose a plan, and call `apply_plan`. The folders appear on the phone

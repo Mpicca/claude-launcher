@@ -30,6 +30,19 @@ jobs:
       - name: Core unit tests
         run: ./gradlew :core:test --no-daemon --stacktrace
 
+      # Bundle the ngrok agent (linux/arm64, works on Android's bionic as a static Go binary)
+      # as a "native library" so the app can exec it. Not committed: fetched fresh each build.
+      - name: Fetch ngrok agent
+        run: |
+          set -euo pipefail
+          mkdir -p app/src/main/jniLibs/arm64-v8a
+          curl -fsSL --retry 3 "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-arm64.tgz" -o /tmp/ngrok.tgz
+          tar -xzf /tmp/ngrok.tgz -C /tmp ngrok
+          file /tmp/ngrok | grep -q "ARM aarch64"
+          mv /tmp/ngrok app/src/main/jniLibs/arm64-v8a/libngrok.so
+          chmod +x app/src/main/jniLibs/arm64-v8a/libngrok.so
+          ls -la app/src/main/jniLibs/arm64-v8a/
+
       - name: Assemble debug APK
         run: ./gradlew :app:assembleDebug --no-daemon --stacktrace
 

@@ -12,8 +12,9 @@ android {
         applicationId = "dev.picca.launcher"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
+        ndk { abiFilters += listOf("arm64-v8a") } // the bundled ngrok agent is arm64 only
     }
 
     buildTypes {
@@ -35,6 +36,10 @@ android {
 
     packaging {
         resources.excludes += setOf("META-INF/INDEX.LIST", "META-INF/io.netty.versions.properties", "META-INF/DEPENDENCIES")
+        // The ngrok agent ships as src/main/jniLibs/arm64-v8a/libngrok.so (placed there by CI).
+        // Legacy packaging extracts it to nativeLibraryDir at install time, which is the one
+        // place a non-root app may exec a binary from on Android 10+.
+        jniLibs.useLegacyPackaging = true
     }
 }
 
