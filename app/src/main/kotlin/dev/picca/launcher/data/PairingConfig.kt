@@ -29,13 +29,18 @@ class PairingConfig(context: Context) {
 
     /** ngrok static domain, e.g. `quiet-otter-123.ngrok-free.app` (no scheme, no path). */
     var ngrokDomain: String
-        get() = prefs.getString(KEY_NGROK_DOMAIN, "") ?: ""
-        set(value) {
-            // Accept whatever was pasted: "https://x.ngrok-free.app/t/abc/mcp" → "x.ngrok-free.app"
-            val cleaned = value.trim().removePrefix("https://").removePrefix("http://")
-                .substringBefore('/').substringBefore('?').substringBefore(':').lowercase()
-            prefs.edit().putString(KEY_NGROK_DOMAIN, cleaned).apply()
-        }
+        get() = hostnameIn(prefs.getString(KEY_NGROK_DOMAIN, "") ?: "") // re-clean values saved by older builds
+        set(value) { prefs.edit().putString(KEY_NGROK_DOMAIN, hostnameIn(value)).apply() }
+
+    /**
+     * Accept whatever was pasted — a bare domain, a URL with a path, or the dashboard's whole
+     * sample command ("ngrok http 8080 --url https://x.ngrok-free.dev") — and keep just the
+     * hostname. Prefers an ngrok host if several hostnames appear.
+     */
+    private fun hostnameIn(value: String): String {
+        val hosts = HOST_RE.findAll(value.lowercase()).map { it.value }.toList()
+        return hosts.firstOrNull { "ngrok" in it } ?: hosts.firstOrNull() ?: ""
+    }
 
     val tunnelConfigured: Boolean get() = ngrokAuthtoken.isNotBlank() && ngrokDomain.isNotBlank()
 
@@ -56,5 +61,6 @@ class PairingConfig(context: Context) {
         private const val KEY_ENABLED = "enabled"
         private const val KEY_NGROK_TOKEN = "ngrok_authtoken"
         private const val KEY_NGROK_DOMAIN = "ngrok_domain"
+        private val HOST_RE = Regex("""\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}\b""")
     }
 }

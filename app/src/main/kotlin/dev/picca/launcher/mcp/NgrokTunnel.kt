@@ -99,19 +99,24 @@ class NgrokTunnel(private val context: Context) {
     private fun runOnce(port: Int, authtoken: String, domain: String) {
         val home = File(context.filesDir, "ngrok").apply { mkdirs() }
         val cfg = File(home, "ngrok.yml")
-        // dns_resolver_ips: Go binaries can't read Android's DNS settings (no /etc/resolv.conf),
-        // so give the agent resolvers explicitly.
+        // Go binaries can't see Android's DNS settings (there is no /etc/resolv.conf), so the
+        // stock resolver dials [::1]:53 and fails. Three mitigations, all needed:
+        //   dns_resolver_ips  – the agent's own session/tunnel dials use these resolvers
+        //   crl_noverify      – the pre-auth CRL fetch uses the stock resolver → skip it
+        //   update_check      – same for the update ping (only a warning, but noisy)
         cfg.writeText(
             """
             version: "2"
             authtoken: "$authtoken"
             web_addr: false
+            update_check: false
+            crl_noverify: true
             dns_resolver_ips: ["1.1.1.1", "8.8.8.8", "9.9.9.9"]
             """.trimIndent() + "\n",
         )
         val cmd = listOf(
             binary.absolutePath, "http", "127.0.0.1:$port",
-            "--domain", domain,
+            "--url", "https://$domain",
             "--config", cfg.absolutePath,
             "--log", "stdout", "--log-format", "json",
         )
