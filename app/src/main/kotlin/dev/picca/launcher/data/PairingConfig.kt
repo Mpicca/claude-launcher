@@ -31,7 +31,9 @@ class PairingConfig(context: Context) {
     var ngrokDomain: String
         get() = prefs.getString(KEY_NGROK_DOMAIN, "") ?: ""
         set(value) {
-            val cleaned = value.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
+            // Accept whatever was pasted: "https://x.ngrok-free.app/t/abc/mcp" → "x.ngrok-free.app"
+            val cleaned = value.trim().removePrefix("https://").removePrefix("http://")
+                .substringBefore('/').substringBefore('?').substringBefore(':').lowercase()
             prefs.edit().putString(KEY_NGROK_DOMAIN, cleaned).apply()
         }
 

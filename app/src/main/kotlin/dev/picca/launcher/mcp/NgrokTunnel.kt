@@ -35,6 +35,23 @@ class NgrokTunnel(private val context: Context) {
     val binary: File get() = File(context.applicationInfo.nativeLibraryDir, "libngrok.so")
     val available: Boolean get() = binary.canExecute()
 
+    private val recent = ArrayDeque<String>()
+    private fun remember(line: String) = synchronized(recent) {
+        recent.addLast(line.take(600))
+        while (recent.size > 80) recent.removeFirst()
+    }
+
+    /** Everything needed to debug a tunnel problem from a pasted message. Secrets are redacted. */
+    fun diagnostics(authtoken: String, domain: String): String = buildString {
+        appendLine("claude-launcher tunnel diagnostics")
+        appendLine("state: ${state.value}")
+        appendLine("binary: ${binary.absolutePath} exists=${binary.exists()} exec=${binary.canExecute()} size=${binary.length()}")
+        appendLine("abi: ${android.os.Build.SUPPORTED_ABIS.joinToString()}  sdk=${android.os.Build.VERSION.SDK_INT}")
+        appendLine("domain: '$domain'  authtoken: ${if (authtoken.isBlank()) "(empty)" else "len=${authtoken.length} ${authtoken.take(4)}…"}")
+        appendLine("--- last log lines ---")
+        synchronized(recent) { recent.forEach { appendLine(it.replace(authtoken.ifBlank { "\u0000" }, "<authtoken>")) } }
+    }
+
     /** Starts (or restarts) the agent forwarding `127.0.0.1:[port]` to [domain]. Idempotent. */
     @Synchronized
     fun start(port: Int, authtoken: String, domain: String) {
@@ -67,6 +84,7 @@ class NgrokTunnel(private val context: Context) {
                 return
             } catch (e: Throwable) {
                 Log.e(TAG, "ngrok failed", e)
+                remember("exception: $e")
                 _state.value = State.Error(e.message ?: e.javaClass.simpleName)
             }
             if (!wantRunning.get()) return
@@ -106,6 +124,7 @@ class NgrokTunnel(private val context: Context) {
             .start()
         process = p
         _state.value = State.Starting
+        remember("exec: ${cmd.drop(1).joinToString(" ")}")
         Log.i(TAG, "ngrok started: ${cmd.drop(1).joinToString(" ")}")
 
         p.inputStream.bufferedReader().useLines { lines ->
@@ -115,12 +134,14 @@ class NgrokTunnel(private val context: Context) {
             }
         }
         val code = p.waitFor()
+        remember("exit: code=$code")
         Log.w(TAG, "ngrok exited with $code")
         if (wantRunning.get() && _state.value !is State.Error) _state.value = State.Error("ngrok exited ($code)")
     }
 
     private fun handleLogLine(line: String) {
         if (line.isBlank()) return
+        remember(line)
         Log.d(TAG, line.take(400))
         val url = URL_RE.find(line)?.groupValues?.get(1)
         if (url != null && (line.contains("started tunnel") || line.contains("\"obj\":\"tunnels\""))) {

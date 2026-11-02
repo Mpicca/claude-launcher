@@ -73,6 +73,7 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     val ngrokAuthtoken: String get() = launcherApp.pairing.ngrokAuthtoken
     val ngrokDomain: String get() = launcherApp.pairing.ngrokDomain
     val connectorUrl: String? get() = launcherApp.pairing.connectorUrl
+    fun tunnelDiagnostics(): String = launcherApp.tunnel.diagnostics(launcherApp.pairing.ngrokAuthtoken, launcherApp.pairing.ngrokDomain)
 
     /** One-time setup: save the ngrok credentials, turn the server on, and (re)start it so the tunnel comes up. */
     fun saveTunnel(authtoken: String, domain: String) {

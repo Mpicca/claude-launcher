@@ -317,6 +317,7 @@ private fun SettingsSheet(vm: HomeViewModel) {
                         OutlinedButton(onClick = { clipboard.setText(AnnotatedString(connectorUrl)) }) { Text("Copy connector URL") }
                     }
                 }
+                TextButton(onClick = { clipboard.setText(AnnotatedString(vm.tunnelDiagnostics())) }) { Text("Copy diagnostics (paste to Claude if the tunnel fails)") }
                 Spacer(Modifier.height(8.dp))
                 val (status, color) = when (val s = tunnelState) {
                     is NgrokTunnel.State.Off -> (if (vm.tunnelAvailable) "Tunnel off" else "ngrok not bundled in this build") to Color(0xFFBDBDBD)
