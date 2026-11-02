@@ -52,6 +52,21 @@
                 android:value="Local MCP server that lets the user's AI assistant organize this launcher's home screen" />
         </service>
 
+        <!-- "Hands": accessibility service so Claude can organize apps inside One UI Home. Off until the
+             user enables it in Settings → Accessibility. -->
+        <service
+            android:name=".hands.HandsService"
+            android:label="@string/hands_name"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/hands_accessibility" />
+        </service>
+
         <receiver
             android:name=".mcp.BootReceiver"
             android:exported="true">

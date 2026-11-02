@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Claude Launcher</string>
+    <string name="hands_name">Claude Launcher Hands</string>
+    <string name="hands_description">Lets Claude (via your own token-protected connector) see the screen and tap, swipe and type on it, so it can organize apps into folders inside Samsung One UI Home. It does nothing unless you ask Claude to organize your apps. Turn it off here any time.</string>
 </resources>

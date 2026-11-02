@@ -344,6 +344,34 @@ private fun SettingsSheet(vm: HomeViewModel) {
             }
         }
         Spacer(Modifier.height(8.dp))
+        // ── Hands: accessibility service for organizing One UI Home ─────────────────────────
+        val ctx = LocalContext.current
+        Surface(color = Color(0x22FFFFFF), shape = RoundedCornerShape(10.dp)) {
+            Column(Modifier.padding(12.dp)) {
+                Text("Hands (organize Samsung's own home screen)", fontWeight = FontWeight.Bold)
+                Text(
+                    "Lets Claude see and tap the screen to build folders inside One UI Home. " +
+                        "Enable \"Claude Launcher Hands\" under Accessibility → Installed apps. " +
+                        "If the switch is greyed out: App info → ⋮ → Allow restricted settings, then try again.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.height(6.dp))
+                Row {
+                    OutlinedButton(onClick = {
+                        ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }) { Text("Open Accessibility settings") }
+                    Spacer(Modifier.size(8.dp))
+                    OutlinedButton(onClick = {
+                        ctx.startActivity(
+                            android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                                .setData(android.net.Uri.parse("package:" + ctx.packageName))
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }) { Text("App info") }
+                }
+            }
+        }
+        Spacer(Modifier.height(8.dp))
         Row {
             TextButton(onClick = { clipboard.setText(AnnotatedString("/t/$token/mcp")) }) { Text("Copy path") }
             TextButton(onClick = { token = vm.rotateToken() }) { Text("Rotate token") }

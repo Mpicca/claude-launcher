@@ -6,6 +6,7 @@ import dev.picca.launcher.core.mcp.McpServer
 import dev.picca.launcher.data.FileLayoutStore
 import dev.picca.launcher.data.InstalledAppCatalog
 import dev.picca.launcher.data.PairingConfig
+import dev.picca.launcher.hands.HandsTools
 import dev.picca.launcher.mcp.McpService
 import dev.picca.launcher.mcp.NgrokTunnel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,7 +42,10 @@ class LauncherApp : Application() {
         _layoutFlow.value = initial
         // Drop references to anything uninstalled since last run (harmless if nothing changed).
         runCatching { engine.pruneUninstalled() }
-        mcp = McpServer(engine, serverVersion = BuildConfig.VERSION_NAME)
+        mcp = McpServer(
+            engine, serverVersion = BuildConfig.VERSION_NAME,
+            extraTools = HandsTools.tools, extraInstructions = HandsTools.INSTRUCTIONS,
+        )
         catalog.onChanged = { runCatching { engine.pruneUninstalled() }; _layoutFlow.value = engine.current }
         catalog.startWatching()
         tunnel = NgrokTunnel(this)

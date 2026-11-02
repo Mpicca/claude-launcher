@@ -28,9 +28,14 @@ class McpServer(
     private val engine: LayoutEngine,
     private val serverName: String = "claude-launcher",
     private val serverVersion: String = "0.1.0",
+    /** Platform-specific tools contributed by the host (e.g. the Android accessibility "hands"). */
+    private val extraTools: List<ToolSpec> = emptyList(),
+    private val extraInstructions: String = "",
 ) {
     companion object {
         const val PROTOCOL_VERSION = "2025-06-18"
+        const val IMAGE_KEY = "_image_base64"
+        const val IMAGE_MIME_KEY = "_image_mime"
         val SUPPORTED_PROTOCOL_VERSIONS = setOf("2024-11-05", "2025-03-26", "2025-06-18")
     }
 
@@ -38,7 +43,7 @@ class McpServer(
     var initialized: Boolean = false
         private set
 
-    val tools: List<ToolSpec> = buildTools()
+    val tools: List<ToolSpec> = buildTools() + extraTools
 
     /** Handle one raw JSON-RPC message. Returns the serialized response, or null for notifications. */
     fun handle(raw: String): String? {
@@ -95,7 +100,8 @@ class McpServer(
                 "This server controls the home-screen layout of the Claude Launcher app on the user's Android phone. " +
                     "It can only arrange icons and folders inside that launcher; it cannot install, uninstall, disable, " +
                     "or modify any other app, and every change can be reverted with the undo tool. " +
-                    "Typical flow: call list_apps, propose an organization, then apply_plan.",
+                    "Typical flow: call list_apps, propose an organization, then apply_plan." +
+                    (if (extraInstructions.isBlank()) "" else " $extraInstructions"),
             )
         }
     }
@@ -117,13 +123,23 @@ class McpServer(
     }
 
     private fun toolResult(payload: JsonElement, isError: Boolean): JsonObject = buildJsonObject {
+        // Convention for host tools: a payload object may carry IMAGE_KEY (base64) + IMAGE_MIME_KEY,
+        // which become an image content block instead of being echoed as text.
+        val image = (payload as? JsonObject)?.get(IMAGE_KEY)?.let { it as? JsonPrimitive }?.content
+        val mime = (payload as? JsonObject)?.get(IMAGE_MIME_KEY)?.let { it as? JsonPrimitive }?.content ?: "image/jpeg"
+        val textPayload: JsonElement = if (image != null) {
+            JsonObject((payload as JsonObject).filterKeys { it != IMAGE_KEY && it != IMAGE_MIME_KEY })
+        } else payload
         putJsonArray("content") {
             add(buildJsonObject {
                 put("type", "text")
-                put("text", JsonRpc.json.encodeToString(JsonElement.serializer(), payload))
+                put("text", JsonRpc.json.encodeToString(JsonElement.serializer(), textPayload))
             })
+            if (image != null) {
+                add(buildJsonObject { put("type", "image"); put("data", image); put("mimeType", mime) })
+            }
         }
-        put("structuredContent", payload)
+        put("structuredContent", textPayload)
         put("isError", isError)
     }
 
@@ -349,6 +365,7 @@ class ToolSpec(
     val description: String,
     val schema: JsonObject,
     val readOnly: Boolean = false,
+    val destructive: Boolean = false,
     val handler: (JsonObject) -> JsonElement,
 ) {
     fun toJson(): JsonObject = buildJsonObject {
@@ -357,7 +374,7 @@ class ToolSpec(
         put("inputSchema", schema)
         putJsonObject("annotations") {
             put("readOnlyHint", readOnly)
-            put("destructiveHint", false) // every mutation is undoable and cosmetic
+            put("destructiveHint", destructive) // launcher mutations are undoable; UI automation is not
             put("idempotentHint", readOnly)
             put("openWorldHint", false)
         }
@@ -366,7 +383,7 @@ class ToolSpec(
 
 // --------------------------------------------------- tiny JSON-schema builder
 
-internal class SchemaBuilder {
+class SchemaBuilder {
     private val props = mutableMapOf<String, JsonElement>()
     private val req = mutableListOf<String>()
 
@@ -399,4 +416,4 @@ internal class SchemaBuilder {
     }
 }
 
-internal fun schema(block: SchemaBuilder.() -> Unit): JsonObject = SchemaBuilder().apply(block).build()
+fun schema(block: SchemaBuilder.() -> Unit): JsonObject = SchemaBuilder().apply(block).build()

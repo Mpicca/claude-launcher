@@ -147,6 +147,24 @@ curl -s -H "Authorization: Bearer my-secret-token" -H "Content-Type: application
 Point a tunnel at it, add it as a connector, and you can test the whole Claude flow
 without touching the phone.
 
+## Organizing Samsung One UI Home instead ("Hands")
+
+One UI Home has no API, so the app also ships an **accessibility service** that lets Claude see
+the screen (scaled screenshots + UI tree) and tap / long-press / swipe / type — enough to drive
+One UI's own multi-select → **Create folder** flow in the app drawer. You keep Samsung's launcher,
+wallpaper, Finder and settings; Claude just does the finger work.
+
+1. Install the APK; in **Claude ○** tap **Open Accessibility settings** → Installed apps →
+   **Claude Launcher Hands** → On. On Android 13+ a sideloaded app's switch is greyed out until
+   you tap **App info** → ⋮ → **Allow restricted settings**.
+2. Ask Claude: *"Organize my Samsung app drawer into folders."* It calls `hands_open_drawer`,
+   looks with `hands_screenshot` / `hands_dump`, and acts with `hands_click_text`,
+   `hands_long_press`, `hands_swipe`, `hands_type`, `hands_key`.
+3. Turn the service off in Accessibility settings whenever you like; the tools then refuse.
+
+The `hands_*` tools are gated by the same token as everything else, plus the accessibility
+toggle. They are marked `destructiveHint` because UI automation has no undo.
+
 ## MCP tools
 
 | Tool | Purpose |
