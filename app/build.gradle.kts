@@ -17,7 +17,23 @@ android {
         ndk { abiFilters += listOf("arm64-v8a") } // the bundled ngrok agent is arm64 only
     }
 
+    // A fixed debug key committed to the repo so every CI build is signed identically and
+    // each new APK installs as an *update* (same package + same signature). Without this,
+    // every GitHub Actions runner would mint its own throwaway debug key and Android would
+    // refuse the next APK with "App not installed". Debug-only; password is the stock "android".
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
         }

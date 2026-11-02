@@ -102,7 +102,9 @@ changes, and the app runs the tunnel itself — on boot, after updates, on any n
 1. At [dashboard.ngrok.com](https://dashboard.ngrok.com): copy your **Authtoken**
    (Getting Started → Your Authtoken) and claim your free **static domain**
    (Universal Gateway → Domains → New Domain; it looks like `name.ngrok-free.app`).
-2. On the phone: **Claude ○** → paste both → **Save & start**. The sheet shows
+2. On the phone, install the APK from the `latest` release. (If you installed a build from
+   before the fixed signing key was added, uninstall it once first — Android shows
+   "App not installed" when the signature changes.) Then: **Claude ○** → paste both → **Save & start**. The sheet shows
    `Online: https://name.ngrok-free.app` within a few seconds, and the
    **Claude connector URL** underneath. Tap **Copy connector URL**.
 3. Claude → Settings → Connectors → **Add custom connector** → paste that URL.
